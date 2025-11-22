@@ -8,12 +8,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import Adapted_Block 
+
 from typing import Optional, Tuple, Type
 
 from .common import LayerNorm2d, MLPBlock
 
 
-# This class and its supporting functions below lightly adapted from the ViTDet backbone available at: https://github.com/facebookresearch/detectron2/blob/main/detectron2/modeling/backbone/vit.py # noqa
+# This class and its supporting functions below lightly adapted from 
 class ImageEncoderViT(nn.Module):
     def __init__(
         self,
@@ -33,7 +35,7 @@ class ImageEncoderViT(nn.Module):
         rel_pos_zero_init: bool = True,
         window_size: int = 0,
         global_attn_indexes: Tuple[int, ...] = (),
-        blocks: Optional[nn.ModuleList] = None, ## Allow passing in custom blocks for flexibility.**
+        transformer_block : Type[nn.Module] = Adapted_Block, ## Allow passing in custom blocks for flexibility.**
     ) -> None:
         """
         Args:
@@ -56,7 +58,6 @@ class ImageEncoderViT(nn.Module):
         super().__init__()
         self.img_size = img_size
 
-        self.blocks = blocks  ## Allow passing in custom blocks for flexibility.**
 
         self.patch_embed = PatchEmbed(
             kernel_size=(patch_size, patch_size),
@@ -72,9 +73,10 @@ class ImageEncoderViT(nn.Module):
                 torch.zeros(1, img_size // patch_size, img_size // patch_size, embed_dim)
             )
 
-        if self.blocks is None:  ## Check if custom blocks were provided.**
-            self.blocks = nn.ModuleList()
-            for i in range(depth):
+        self.blocks = nn.ModuleList()
+
+        for i in range(depth):
+            if transformer_block is None:  ## Check if custom blocks were provided.**
                 block = Block(
                     dim=embed_dim,
                     num_heads=num_heads,
@@ -87,7 +89,14 @@ class ImageEncoderViT(nn.Module):
                     window_size=window_size if i not in global_attn_indexes else 0,
                     input_size=(img_size // patch_size, img_size // patch_size),
                 )
-                self.blocks.append(block)
+            else:
+                block = transformer_block(
+
+                )
+                
+            self.blocks.append(block)
+            
+        
 
         self.neck = nn.Sequential(
             nn.Conv2d(
